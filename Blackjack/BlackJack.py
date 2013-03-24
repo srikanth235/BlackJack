@@ -6,6 +6,7 @@ from google.appengine.ext.webapp import template
 
 import random
 import os
+import json
 
 class Game(ndb.Model):
     name = ndb.StringProperty(required=True)
@@ -56,7 +57,14 @@ class CreatePlayer(webapp.RequestHandler):
                     tokens = int(self.request.get("tokens"))
                  )
         player.put()
-        self.response.out.write(player.identifier)
+        player_stringified = json.dumps({
+                                 "name": player.name, 
+                                 "identifier": player.identifier,
+                                 "avatar_url": player.avatar_url,
+                                 "tokens": player.tokens
+                             })
+        self.response.headers['Content-Type'] = 'application/json'
+        self.response.out.write(player_stringified)
 
 class JoinPlayer(webapp.RequestHandler):
     def post(self, game_id):

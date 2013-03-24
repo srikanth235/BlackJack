@@ -11,13 +11,10 @@ function registerPlayer() {
    name = $("#name").val();
    tokens = $("#tokens").val();
    avatar_url = $("#avatar_url").val();
-   alert(name+" "+tokens+" "+avatar_url);
    $.post("http://localhost:8080/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
    .done(function(data) {
         $("body").html("Player created successfully");
-        id = parseInt(data)
-        player = JSON.stringify({"name" : name, "tokens" : tokens, "avatar_url": avatar_url, "id":id})
-        localStorage.setItem("player", player); 
+        localStorage.setItem("player", data); 
    })
    .fail(function() {
         $("body").html("Player creation failed");
