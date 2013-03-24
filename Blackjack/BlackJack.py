@@ -16,18 +16,18 @@ class Game(ndb.Model):
     cards_dealt = ndb.StringProperty(repeated=True)
 
 class Player(ndb.Model):
-    name = db.StringProperty(required=True)
-    identifier = db.StringProperty(required=True)
-    tokens = db.IntegerProperty()
-    avatar_url = db.StringProperty()
-    cards_visible = db.StringListProperty()
-    cards_not_visible = db.StringListProperty()
+    name = ndb.StringProperty(required=True)
+    identifier = ndb.IntegerProperty(required=True)
+    tokens = ndb.IntegerProperty()
+    avatar_url = ndb.StringProperty()
+    cards_visible = ndb.StringProperty(repeated=True)
+    cards_not_visible = ndb.StringProperty(repeated=True)
 
 class Game_Status():
-    valid_actions = db.StringListProperty()
-    cards_visible = db.StringListProperty()
-    common_cards_visible = db.StringListProperty()
-    players = db.StringListProperty()
+    valid_actions = ndb.StringProperty(repeated=True)
+    cards_visible = ndb.StringProperty(repeated=True)
+    common_cards_visible = ndb.StringProperty(repeated=True)
+    players = ndb.StringProperty(repeated=True)
 
 class MainPage(webapp.RequestHandler):
     def get(self):
@@ -48,8 +48,39 @@ class MainPage(webapp.RequestHandler):
                      + self.request.get("name")
                      + " created successfully</body></html>")
 
+class CreatePlayer(webapp.RequestHandler):
+    def post(self):
+        player = Player(name = self.request.get("name"),
+                    identifier = random.randint(0, 1000000),
+                    avatar_url = self.request.get("avatar_url"),
+                    tokens = int(self.request.get("tokens"))
+                 )
+        player.put()
+        self.response.out.write(player.identifier)
+
+class JoinPlayer(webapp.RequestHandler):
+    def post(self, game_id):
+        self.response.out.write(game_id)
+    
+class PlayerStatus(webapp.RequestHandler):
+    def post(self, game_id):
+        self.response.out.write(game_id)
+         
+class VisibleTable(webapp.RequestHandler):
+    def post(self, game_id):
+        self.response.out.write(game_id)
+        
+class GameAction(webapp.RequestHandler): 
+    def post(self, game_id):
+        self.response.out.write(game_id)
+
 app = webapp.WSGIApplication(
-          [('/games', MainPage)],
+          [('/games', MainPage),
+          ('/player', CreatePlayer),
+          (r'/game/(.*)/playerConnect', JoinPlayer),
+          (r'/game/(.*)/status', PlayerStatus),
+          (r'/game/(.*)/visible_table', VisibleTable),
+          (r'/game/(.*)/action', GameAction)],
            debug=True)
 
 def main():

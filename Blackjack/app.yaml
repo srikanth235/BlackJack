@@ -5,6 +5,8 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /game/.*/playerConnect
+- url: /html
+  static_dir: html
+
 - url: /.*
   script: BlackJack.app

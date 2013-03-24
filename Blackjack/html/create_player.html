@@ -1,0 +1,47 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title>Create BlackJack Game</title>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.0/themes/base/jquery-ui.css" />
+<link rel = "stylesheet" href = "stylesheet.css">
+<script src="http://code.jquery.com/jquery-1.8.3.js"></script>
+<script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
+<script> 
+function registerPlayer() {
+   name = $("#name").val();
+   tokens = $("#tokens").val();
+   avatar_url = $("#avatar_url").val();
+   alert(name+" "+tokens+" "+avatar_url);
+   $.post("http://localhost:8080/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
+   .done(function(data) {
+        $("body").html("Player created successfully");
+        id = parseInt(data)
+        player = JSON.stringify({"name" : name, "tokens" : tokens, "avatar_url": avatar_url, "id":id})
+        localStorage.setItem("player", player); 
+   })
+   .fail(function() {
+        $("body").html("Player creation failed");
+   })
+}
+</script>
+</head>
+<body>
+<table align="left">
+  <tr>
+    <td>Name: </td> 
+    <td><input type = "text" id = "name"/></td>
+  </tr>
+  <tr>
+    <td>Tokens:</td> 
+    <td><input type = "text" id = "tokens"/></td>
+  </tr>
+  <tr>
+    <td>Avatar URL:</td> 
+    <td><input type = "text" id = "avatar_url"/></td>
+  </tr>
+  <tr>
+    <td colspan = "2" align = "center"><input onclick = registerPlayer() type = "submit"/></td>
+  </tr>
+</table>
+</body>
+</html>

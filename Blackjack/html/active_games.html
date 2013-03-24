@@ -3,7 +3,13 @@
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script>
-/* Functions for adding listeners end here */ 
+function sendPostRequest(game_id) {
+   $.post("http://localhost:8080/game/" + game_id +"/playerConnect", 
+   function(data) {$("body").html(data)});
+}
+/* Functions for adding listeners end here */
+$(document).ready(function() {
+}); 
 </script>
 </head>
  <body>
@@ -22,13 +28,17 @@
    <th>
      Max Players
    </th>
+   <th>
+     Status
+   </th>
    </tr>
    {% for game in rows %}
    <tr>
        <td> {{ game.name }} </td>
-       <td> {{ game.identifier }} </td>
+       <td> {{ game.identifier }} </a></td>
        <td> {{ game.players_current }} </td>
        <td> {{ game.players_max }} </td>
+       <td> <input type = "submit" onclick = sendPostRequest({{game.identifier}}) value = "Check Status">
    </tr>
    {% endfor %}
    <br>
