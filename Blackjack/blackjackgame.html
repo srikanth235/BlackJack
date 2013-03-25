@@ -3,30 +3,38 @@
 <head>
 <title>BlackJack</title>
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.0/themes/base/jquery-ui.css" />
-<link rel = "stylesheet" href = "stylesheet.css">
+<link rel = "stylesheet" href = "/html/stylesheet.css">
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script src="domevents.js"></script>
 </head>
 <body>
-<div class="bjtable">
-<table>
-  <tr>
-     <td align = "center" id = "dealer"> 
-     </td>  
+  <table width=100%>
+   <tr>
+   <td class = "dealer" colspan = {{count}}>
+   <div class="card_container">
+        {% for card in dealer_cards %}
+           <img src="/images/deck/{{card}}.png" class="card"/>
+        {% endfor %}
+   </div>
+   <tr> 
+   {% for player in players %} 
+       <td>
+       <div class="card_container">
+         {% for card in player.cards %}
+            <img src="/images/deck/{{card}}.png" class="card"/>
+         {% endfor %}
+       </div>
+       </td>
+   {% endfor %}
   </tr>
   <tr>
-     <td align = "center" id = "player"> 
-     </td>
-  </tr>
-  <tr>
-     <td colspan = 2 align = "center">
+     <td align = "center" colspan = {{count}}>
        <input type="submit" id = "hit" value = "hit"/>
        <input type="submit" id = "stand" value = "stand"/>
        <input type="submit" id = "double" value = "double"/> 
      </td>
   </tr>
 </table>
-</div>
 </body>
 </html>

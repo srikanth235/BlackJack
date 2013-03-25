@@ -3,34 +3,76 @@
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script>
+server_url = "http://localhost:8080/"
+function get_server_url() {
+    return server_url;
+}
 function sendPostRequest(game_id) {
-    var url = "http://localhost:8080/game/" + game_id +"/status";
+    var url = server_url + "game/" + game_id +"/status";
     $.post(url, {"player":localStorage.getItem("player")})
     .done(function(data) {
         $("body").html(data)
     })
     .fail(function() {"Not able to join the game"});
 }
+
+function addJoinListener(element, game_id) {
+    element.on("click", function() { 
+                var url = server_url +"game/" + game_id +"/playerConnect";
+                $.post(url, {"player":localStorage.getItem("player")})
+                .done(function(data) {
+                        element.val("Play")
+                        element.removeClass("Join");
+                        element.addClass("Play");
+                        alert(data);
+                     })
+                .fail(function() {
+                         alert("Not able to join the game")
+                     })
+                });
+}
+
+function addPlayListener(element, game_id) {
+}
+
 function populateStatus() {
     $(".game").each(
         function() {
-            game_id = $(this).find(".game_id").text();
-            var url = "http://localhost:8080/game/" + game_id +"/status";
+            var game_id = $(this).find(".game_id").text();
+            var url = server_url + "game/" + game_id +"/status";
             var element = $(this).find(".status");
             $.post(url, {"player":localStorage.getItem("player")})
             .done(function(data) {
-                element.html("<input type= 'submit' value =" + data + "class = " + data +"/>")
+                element.html("<input type= 'submit' value =" + data + "></input>")
+                element.children().addClass(data)
+                if(data === "Join") {
+                    addJoinListener(element.children(), game_id)
+                }
             })
-           .fail(function() {"Not able to join the game"});
-     })
+           .fail(function() {$("body").html("Not able to join the game")});
+    })
 }
 
+function sendConnectRequest(game_id) {
+    $(".game").each(function() {
+            var game_id = parseInt(game_id)
+            var url = server_url +"game/" + game_id +"/playerConnect";
+            $(this).find(".Join").click(
+                function() {
+                    alert("here");
+                    $.post(url, {"player":localStorage.getItem("player")})
+                    .done(function(data) {
+                        element.html("<input type = 'submit' value = 'play' class = 'play'/>")
+                     })
+                    .fail(function() {$("body").html("Not able to join the game")});
+                }
+            )
+        }
+    ) 
+}
 /* Functions for adding listeners end here */
 $(document).ready(function() {
     populateStatus();
-    addJoinListener();
-    addPlayListener();
-    addClickListener();
 }); 
 </script>
 </head>
@@ -57,7 +99,7 @@ $(document).ready(function() {
    {% for game in rows %}
    <tr class = "game">
        <td> {{ game.name }} </td>
-       <td class = "game_id"> {{ game.identifier }} </a></td>
+       <td class = "game_id"> <a href = "http://localhost:8080/game/{{game.identifier}}/visible_table" >{{ game.identifier }} </a></td>
        <td> {{ game.players_current }} </td>
        <td> {{ game.players_max }} </td>
        <td class = "status"></td>

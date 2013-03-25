@@ -8,13 +8,17 @@ import simplejson
 import random
 import os
 
+deck = ['2s', '2h', '2d', '2c', '3s', '3h', '3d', '3c', '4s', '4h', '4d', '4c', '5s', '5h', '5d', '5c', 
+        '6s', '6h', '6d', '6c', '7s', '7h', '7d', '7c', '8s', '8h', '8d', '8c', '9s', '9h', '9d', '9c', 
+        '10s', '10h', '10d', '10c', 'Js', 'Jh', 'Jd', 'Jc', 'Qs', 'Qh', 'Qd', 'Qc', 'Ks', 'Kh', 'Kd', 'Kc', 
+        'As', 'Ah', 'Ad', 'Ac'];
 class Game(ndb.Model):
     name = ndb.StringProperty(required=True)
     identifier = ndb.IntegerProperty()
     players_max = ndb.IntegerProperty()
     players_current = ndb.IntegerProperty()
     deck = ndb.StringProperty(repeated=True)
-    common_cards_visible = ndb.StringProperty(repeated=True)
+    common_cards = ndb.StringProperty(repeated=True)
     players = ndb.IntegerProperty(repeated=True)
 
 class Player(ndb.Model):
@@ -24,11 +28,11 @@ class Player(ndb.Model):
     avatar_url = ndb.StringProperty()
     games = ndb.IntegerProperty(repeated=True)
 
-class Game_Player_Status():
+class Game_Player_Status(ndb.Model):
     game_id = ndb.IntegerProperty()
     player_id = ndb.IntegerProperty()
     cards_visible = ndb.StringProperty(repeated=True)
-    cards_not_visible = ndb.StringProperty(repeated=True)
+    cards = ndb.StringProperty(repeated=True)
     actions_taken = ndb.StringProperty(repeated=True)
 
 class MainPage(webapp.RequestHandler):
@@ -42,8 +46,8 @@ class MainPage(webapp.RequestHandler):
                     players_max = int(self.request.get("players_max")),
                     identifier = random.randint(0, 1000000),
                     players_current = 0,
-                    deck = [],
-                    cards_dealt = [])
+                    deck = deck,
+                    common_cards = [])
         game.put()
         self.response.out.write(
                      "<html><body><h2>"
@@ -80,7 +84,11 @@ class JoinPlayer(webapp.RequestHandler):
         player.tokens = player.tokens - 10
         player.games.append(game_id)
         player.put()
-        self.response.out.write("Joined Successfully")
+        # inserts row into Status Player 
+        status = Game_Player_Status(game_id = game_id, player_id = player.identifier, 
+                                    cards_visible = ['10d','10c'], cards = ['10d','10c'], actions_taken = [])
+        status.put()
+        self.response.out.write(simplejson.dumps({"cards":status.cards_visible}))
         
 class PlayerStatus(webapp.RequestHandler):
     def post(self, game_id):
@@ -89,15 +97,20 @@ class PlayerStatus(webapp.RequestHandler):
         cur_player = simplejson.loads(self.request.get("player"))
         if int(cur_player["identifier"]) in game.players:
             self.response.out.write("Play")
-        elif len(game.common_cards_visible) == 0 and game.players_max != game.players_current:
+        elif len(game.common_cards) == 0 and game.players_max != game.players_current:
             self.response.out.write("Join")
         else:
             self.response.out.write("View")
 
 class VisibleTable(webapp.RequestHandler):
-    def post(self, game_id):
-        self.response.out.write(game_id)
-        
+    def get(self, game_id):
+        game_id = int(game_id)
+        game_players = Game_Player_Status.query(Game_Player_Status.game_id == game_id).fetch()
+        count = len(game_players);
+        dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
+        path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
+        self.response.out.write(template.render(path, {'players' : game_players, 'count' : count, 'dealer_cards' : dealer.common_cards}))
+
 class GameAction(webapp.RequestHandler): 
     def post(self, game_id):
         self.response.out.write(game_id)

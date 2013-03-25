@@ -7,6 +7,9 @@ threadsafe: true
 handlers:
 - url: /html
   static_dir: html
+  
+- url: /images
+  static_dir: images
 
 - url: /.*
   script: BlackJack.app
