@@ -1,0 +1,68 @@
+<html>
+<head>
+<script src="http://code.jquery.com/jquery-1.8.3.js"></script>
+<script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
+<script>
+function sendPostRequest(game_id) {
+    var url = "http://localhost:8080/game/" + game_id +"/status";
+    $.post(url, {"player":localStorage.getItem("player")})
+    .done(function(data) {
+        $("body").html(data)
+    })
+    .fail(function() {"Not able to join the game"});
+}
+function populateStatus() {
+    $(".game").each(
+        function() {
+            game_id = $(this).find(".game_id").text();
+            var url = "http://localhost:8080/game/" + game_id +"/status";
+            var element = $(this).find(".status");
+            $.post(url, {"player":localStorage.getItem("player")})
+            .done(function(data) {
+                element.html("<input type= 'submit' value =" + data + "class = " + data +"/>")
+            })
+           .fail(function() {"Not able to join the game"});
+     })
+}
+
+/* Functions for adding listeners end here */
+$(document).ready(function() {
+    populateStatus();
+    addJoinListener();
+    addPlayListener();
+    addClickListener();
+}); 
+</script>
+</head>
+ <body>
+   {{desc}}
+   <table border = 1>
+   <tr>
+   <th>
+     Game Name
+   </th>
+   <th>
+     Game ID
+   </th>
+   <th>
+     Current Players
+   </th>
+   <th>
+     Max Players
+   </th>
+   <th>
+     Status
+   </th>
+   </tr>
+   {% for game in rows %}
+   <tr class = "game">
+       <td> {{ game.name }} </td>
+       <td class = "game_id"> {{ game.identifier }} </a></td>
+       <td> {{ game.players_current }} </td>
+       <td> {{ game.players_max }} </td>
+       <td class = "status"></td>
+   </tr>
+   {% endfor %}
+   <br>
+ </body>
+</html>

@@ -8,12 +8,12 @@
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script> 
 function registerPlayer() {
-   name = $("#name").val();
-   tokens = $("#tokens").val();
-   avatar_url = $("#avatar_url").val();
+   var name = $("#name").val();
+   var tokens = $("#tokens").val();
+   var avatar_url = $("#avatar_url").val();
    $.post("http://localhost:8080/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
    .done(function(data) {
-        $("body").html("Player created successfully");
+        $("body").html("Player crerated successfully");
         localStorage.setItem("player", data); 
    })
    .fail(function() {
@@ -37,7 +37,9 @@ function registerPlayer() {
     <td><input type = "text" id = "avatar_url"/></td>
   </tr>
   <tr>
-    <td colspan = "2" align = "center"><input onclick = registerPlayer() type = "submit"/></td>
+    <td colspan = "2" align = "center">
+        <input onclick = registerPlayer() type = "submit"/>
+    </td>
   </tr>
 </table>
 </body>
