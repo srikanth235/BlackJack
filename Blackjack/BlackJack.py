@@ -86,7 +86,7 @@ class JoinPlayer(webapp.RequestHandler):
         player.put()
         # inserts row into Status Player 
         status = Game_Player_Status(game_id = game_id, player_id = player.identifier, 
-                                    cards_visible = ['10d','10c'], cards = ['10d','10c'], actions_taken = [])
+                                    cards_visible = [], cards = [], actions_taken = [])
         status.put()
         self.response.out.write(simplejson.dumps({"cards":status.cards_visible}))
         
@@ -113,8 +113,13 @@ class VisibleTable(webapp.RequestHandler):
 
 class GameAction(webapp.RequestHandler): 
     def post(self, game_id):
-        self.response.out.write(game_id)
-
+        game_id = int(game_id)
+        game_players = Game_Player_Status.query(Game_Player_Status.game_id == game_id).fetch()
+        count = len(game_players);
+        dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
+        path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
+        self.response.out.write(template.render(path, {'players' : game_players, 'count' : count, 'dealer_cards' : dealer.common_cards, 'actions': ['bet', 'deal']}))
+        
 app = webapp.WSGIApplication(
           [('/games', MainPage),
           ('/player', CreatePlayer),
