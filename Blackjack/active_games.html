@@ -1,13 +1,9 @@
-<html id="html">
+<html>
 <head>
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script>
-server_url = "http://localhost:8080/"
-
-function get_server_url() {
-    return server_url;
-}
+server_url = "http://localhost:8080/";
 
 function addJoinListener(element, game_id) {
     element.on("click", function() { 
@@ -17,6 +13,8 @@ function addJoinListener(element, game_id) {
                         element.val("Play")
                         element.removeClass("join");
                         element.addClass("play");
+                        element.unbind("click");
+                        addPlayListener(element, game_id);
                      })
                 .fail(function() {
                          alert("Not able to join the game")
@@ -26,7 +24,7 @@ function addJoinListener(element, game_id) {
 
 function addPlayListener(element, game_id) {
     element.on("click", function() { 
-                var url = server_url +"game/" + game_id +"/action";
+                var url = server_url +"game/" + parseInt(game_id) +"/action";
                 $.post(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
                         $("body").replaceWith(data)
