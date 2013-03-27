@@ -9,7 +9,7 @@
 <script> 
 function registerPlayer() {
    var name = $("#name").val();
-   var tokens = $("#tokens").val();
+   var tokens = $("#token").val();
    var avatar_url = $("#avatar_url").val();
    $.post("http://localhost:8080/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
    .done(function(data) {
@@ -30,7 +30,7 @@ function registerPlayer() {
   </tr>
   <tr>
     <td>Tokens:</td> 
-    <td><input type = "text" id = "tokens"/></td>
+    <td><input type = "text" id = "token"/></td>
   </tr>
   <tr>
     <td>Avatar URL:</td> 

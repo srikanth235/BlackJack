@@ -23,22 +23,22 @@ def get_value(card):
 
 def has_only_bet(actions):
     for action in actions:
-        if action != "bet":
+        if not str(action).startswith("Bet"):
             return False
     return True
 
 def get_bet_actions(tokens):
     actions = []
     if tokens >= 1:
-        actions.append("bet 1")
+        actions.append("Bet 1")
     if tokens >= 5:
-        actions.append("bet 5")
+        actions.append("Bet 5")
     if tokens >= 25:
-        actions.append("bet 25")
+        actions.append("Bet 25")
     if tokens >= 100:
-        actions.append("bet 100")
+        actions.append("Bet 100")
     if tokens >= 500:
-        actions.append("bet 500")
+        actions.append("Bet 500")
     return actions
 
 def get_hand_value(cards):
@@ -56,13 +56,28 @@ def get_hand_value(cards):
             value = value + 1
     return value
 
-def remove_random_card(game_id):
-    game = Game.query(Game.identifier == game_id).fetch(1)[0]
-    random.shuffle(game.deck)
-    card = game.deck.pop()
-    game.put()
-    return card
-
+def get_next_action(player, tokens):
+    prev_actions = player.actions_taken
+    hand_value = player.hand_value
+    player_bet = player.bet
+    actions = []
+    if hand_value >= 21:
+        actions = []
+    elif len(prev_actions) == 0 or has_only_bet(prev_actions):
+        actions = actions + get_bet_actions(tokens)
+        if len(prev_actions) > 0:
+            actions.append("Deal")
+    elif prev_actions[-1] == "Deal":
+        actions = ["Stand", "Hit"]
+        if player_bet * 2 >= tokens:
+            actions.append("Double") 
+    elif prev_actions[-1] == "Double":
+        actions = [ "Hit"]
+    elif prev_actions[-1] == "Hit" and "Double" in prev_actions:
+        actions = ["Stand"]
+    else:
+        actions = ["Hit", "Stand"]
+    return actions
 
 class Game(ndb.Model):
     name = ndb.StringProperty(required=True)
@@ -184,105 +199,87 @@ class VisibleTable(webapp.RequestHandler):
 
 
 class GameAction(webapp.RequestHandler):
+    def remove_random_card(self, game_id):
+        game = Game.query(Game.identifier == game_id).fetch(1)[0]
+        random.shuffle(game.deck)
+        card = game.deck.pop()
+        game.put()
+        return card
+
+    def update_player_info(self, player_info, value):
+        player_info.tokens = player_info.tokens - value
+        player_info.put()
+
     def post(self, game_id):
         game_id = int(game_id)
         action = self.request.get("action", "None")
-        cur_player = simplejson.loads(self.request.get("player"))
-        player_id = int(cur_player["identifier"])
-        game_players = Game_Player_Status.query(
-                          Game_Player_Status.game_id == game_id).fetch()
-        count = len(game_players)
+        player_id = int(simplejson.loads(self.request.get("player"))["identifier"])
         cur_player = Game_Player_Status.query(ndb.AND(
                          Game_Player_Status.game_id == game_id,
                          Game_Player_Status.player_id == player_id)).fetch(1)[0]
 
-        # updating player tokens
         player_info = Player.query(Player.identifier == player_id).fetch(1)[0]
         value = int(self.request.get("value", 2 * cur_player.bet))
-        if action == "bet" or action == "double":
-            player_info.tokens = player_info.tokens - value
-            player_info.put()
+        new_cards = []
+        if action.startswith("Bet") or action == "Double":
+            self.update_player_info(player_info, value)           
             cur_player.bet = cur_player.bet + value
-        elif action == "deal":
-            cur_player.cards.append(remove_random_card(game_id))
-            cur_player.cards.append(remove_random_card(game_id))
-        elif action == "hit":
-            cur_player.cards.append(remove_random_card(game_id))
-        is_double_bet = len(cur_player.actions_taken) > 0 and cur_player.actions_taken[-1] == "double"
-        if action == "stand" or is_double_bet:
-            cur_player.hand_value = get_hand_value(cur_player.cards)
+        elif action == "Deal":
+            new_cards.append(self.remove_random_card(game_id))
+            new_cards.append(self.remove_random_card(game_id))
+            cur_player.cards = cur_player.cards + new_cards
+        elif action == "Hit":
+            new_cards.append(self.remove_random_card(game_id))
+            cur_player.cards = cur_player.cards + new_cards
 
-        if action != "None":
-            cur_player.actions_taken.append(action)
-            cur_player.put()
-
-        prev_actions = cur_player.actions_taken
-        actions = []
-        if cur_player.hand_value > 0:
-            actions = []
-        elif len(prev_actions) == 0 or has_only_bet(prev_actions):
-            if len(prev_actions) > 0:
-                actions = ["deal"]
-            actions = actions + get_bet_actions(player_info.tokens)
-        elif action == "deal":
-            actions = ["stand", "hit", "double"]
-        elif action == "double":
-            actions = [ "hit"]
-        elif action == "hit" and "double" in prev_actions:
-            actions = ["stand"]
-        else:
-            actions = ["hit", "stand"]
-
+        cur_player.hand_value = get_hand_value(cur_player.cards)
+        cur_player.actions_taken.append(action)
+        cur_player.put()
+        actions = get_next_action(cur_player, player_info.tokens)
         dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
-        path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
-        self.response.out.write(template.render(path,
-                                  {'players': game_players,
-                                   'count': count,
-                                   'dealer_cards': dealer.common_cards_visible,
+        player_stringified = simplejson.dumps({
                                    'actions': actions,
                                    'tokens': player_info.tokens,
-                                   'game_id': game_id
-                                  }))
-
+                                   'cards': new_cards
+                            })
+        self.response.out.write(player_stringified)
 
 class GamePlay(webapp.RequestHandler):
-    def post(self, game_id):
+    def get(self, game_id):
         game_id = int(game_id)
-        cur_player = simplejson.loads(self.request.get("player"))
-        player_id = int(cur_player["identifier"])
-        game_players = Game_Player_Status.query(
-                          Game_Player_Status.game_id == game_id).fetch()
+        if(self.request.get("player", "-1") != "-1"):
+            player_id = int(simplejson.loads(self.request.get("player"))
+                            ["identifier"])
+        else:
+            player_id = -1
+        game_players = Game_Player_Status.query(ndb.AND(
+                          Game_Player_Status.game_id == game_id,
+                          Game_Player_Status.player_id != player_id)).fetch()
         count = len(game_players)
-        cur_player = Game_Player_Status.query(ndb.AND(
+        dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
+        if player_id != -1:
+            cur_player = Game_Player_Status.query(ndb.AND(
                          Game_Player_Status.game_id == game_id,
                          Game_Player_Status.player_id == player_id)).fetch(1)[0]
-
-        prev_actions = cur_player.actions_taken
-        actions = []
-        if cur_player.hand_value > 0:
-            actions = []
-        elif len(prev_actions) == 0 or has_only_bet(prev_actions):
-            if len(prev_actions) > 0:
-                actions = ["deal"]
-            actions = actions + get_bet_actions(player_info.tokens)
-        elif action == "deal":
-            actions = ["stand", "hit", "double"]
-        elif action == "double":
-            actions = [ "hit"]
-        elif action == "hit" and "double" in prev_actions:
-            actions = ["stand"]
+            player_info = Player.query(Player.identifier == player_id).fetch(1)[0]
+            tokens = player_info.tokens
+            dealer_cards = dealer.common_cards_visible
+            actions = get_next_action(cur_player, tokens)
         else:
-            actions = ["hit", "stand"]
-
+            actions = []
+            tokens = None
+            dealer_cards = dealer.common_cards
+            cur_player = None
         dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
         path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
         self.response.out.write(template.render(path,
                                   {'players': game_players,
                                    'count': count,
-                                   'dealer_cards': dealer.common_cards_visible,
+                                   'dealer_cards': dealer_cards,
                                    'actions': actions,
-                                   'tokens': player_info.tokens,
-                                   'game_id': game_id
+                                   'tokens': tokens,
+                                   'game_id': game_id,
+                                   'cur_player': cur_player
                                   }))
 
 app = webapp.WSGIApplication(
@@ -290,8 +287,8 @@ app = webapp.WSGIApplication(
           ('/player', CreatePlayer),
           (r'/game/(.*)/playerConnect', JoinPlayer),
           (r'/game/(.*)/status', PlayerStatus),
-          (r'/game/(.*)/visible_table', VisibleTable),
-          (r'/game/(.*)/play', GamePlay)
+          (r'/game/(.*)/visible_table', GamePlay),
+          (r'/game/(.*)/play', GamePlay),
           (r'/game/(.*)/action', GameAction)],
            debug=True)
 

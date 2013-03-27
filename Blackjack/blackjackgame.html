@@ -18,7 +18,20 @@ function addActionListeners() {
                          var game_id = {{game_id}}
                          value = str[1]
                          $.post(url, {"action":action, "value":value, "player":localStorage.getItem("player")})
-                         .done(function(data) {$("#bjtable").replaceWith(data); addActionListeners();})
+                         .done(function(data) {
+                                   var player = JSON.parse(data);
+                                   $("#tokens").html("Tokens Remaining:" + player.tokens);
+                                   for(var i = 0; i < player["cards"].length; i++) {
+                                       var card = "/images/deck/" + player["cards"][i] + ".png";
+                                       $("<img src= '" + card + "'class='card'/>").appendTo('#self')
+                                   }
+                                   $("#actions").html("");
+                                   for(var i = 0; i < player["actions"].length; i++) {
+                                       var action = player["actions"][i];
+                                       $("<input type = 'submit' class = 'action' value = '" + action +"'></input>").appendTo('#actions')
+                                   }
+                                   addActionListeners();
+                              })
                          .fail(function() {alert("failed")})
                     })
 }
@@ -47,18 +60,29 @@ $(document).ready(function() {
        </div>
        </td>
    {% endfor %}
+   {% if cur_player %}
+       <td>
+          <div class="card_container" id = "self">
+           <div id = "tokens">
+                Tokens Remaining: {{tokens}}
+            </div>
+            {% for card in cur_player.cards %}
+              <img src="/images/deck/{{card}}.png" class="card"/>
+            {% endfor %}
+            
+          </div>
+          
+       </td>
+   {% endif%}
    </tr>
   {% if actions %}
   <tr>
-  <td align = "center" colspan = {{count}}>
+  <td align = "center" id="actions" colspan = {{count}}>
         {% for action in actions %}
            <input type = "submit" class = "action" value = "{{action}}" > </input>
         {% endfor %}
-        <div class="tokens">
-          Tokens Remaining: {{tokens}}
-        </div>
-    </td>
-    {% endif %}
+   </td>
+   {% endif %}
   </tr>
 </table>
 </body>
