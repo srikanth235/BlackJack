@@ -3,18 +3,22 @@
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script>
-server_url = "http://localhost:8080/";
 
 function addJoinListener(element, game_id) {
     element.on("click", function() { 
-                var url = server_url +"game/" + game_id +"/playerConnect";
+                var url = "/game/" + game_id +"/playerConnect";
                 $.post(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
-                        element.val("Play")
-                        element.removeClass("join");
-                        element.addClass("play");
-                        element.unbind("click");
-                        addPlayListener(element, game_id);
+                        if(data.length > 4) {
+                           element.replaceWith(data);
+                        }
+                        else {
+                           element.val("Play")
+                           element.removeClass("join");
+                           element.addClass("play");
+                           element.unbind("click");
+                           addPlayListener(element, game_id);
+                        }
                      })
                 .fail(function() {
                          alert("Not able to join the game")
@@ -24,7 +28,7 @@ function addJoinListener(element, game_id) {
 
 function addPlayListener(element, game_id) {
     element.on("click", function() { 
-                var url = server_url +"game/" + parseInt(game_id) +"/play";
+                var url = "/game/" + parseInt(game_id) +"/play";
                 $.get(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
                         $("body").replaceWith(data)
@@ -36,7 +40,7 @@ function addPlayListener(element, game_id) {
 }
 
 function createFormHTML(submitValue, game_id) {
-     var url = server_url + "game/" + parseInt(game_id) + "/action"; 
+     var url = "/game/" + parseInt(game_id) + "/action"; 
      var html = "<form method = 'post' action = " 
                 +  url + ">"
                 + "<input type = 'hidden' name = 'player' value = " + localStorage.getItem("player") + "/>"
@@ -49,7 +53,7 @@ function populateStatus() {
     $(".game").each(
         function() {
             var game_id = $(this).find(".game_id").text();
-            var url = server_url + "game/" + game_id +"/status";
+            var url = "/game/" + game_id +"/status";
             var element = $(this).find(".status");
             $.post(url, {"player":localStorage.getItem("player")})
             .done(function(data) {
@@ -97,7 +101,7 @@ $(document).ready(function() {
    {% for game in rows %}
    <tr class = "game">
        <td> {{ game.name }} </td>
-       <td class = "game_id"> <a href = "http://localhost:8080/game/{{game.identifier}}/visible_table" >{{ game.identifier }} </a></td>
+       <td class = "game_id"> <a href = "/game/{{game.identifier}}/visible_table" >{{ game.identifier }} </a></td>
        <td> {{ game.players_current }} </td>
        <td> {{ game.players_max }} </td>
        <td class = "status"></td>

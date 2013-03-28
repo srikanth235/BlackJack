@@ -11,7 +11,7 @@ function registerPlayer() {
    var name = $("#name").val();
    var tokens = $("#token").val();
    var avatar_url = $("#avatar_url").val();
-   $.post("http://localhost:8080/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
+   $.post("/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
    .done(function(data) {
         $("body").html("Player crerated successfully");
         localStorage.setItem("player", data); 

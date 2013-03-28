@@ -89,6 +89,7 @@ class Game(ndb.Model):
     common_cards_visible = ndb.StringProperty(repeated=True)
     players = ndb.IntegerProperty(repeated=True)
     status = ndb.StringProperty()
+    start_time = ndb.DateTimeProperty();
 
 
 class Player(ndb.Model):
@@ -107,7 +108,6 @@ class Game_Player_Status(ndb.Model):
     bet = ndb.IntegerProperty()
     hand_value = ndb.IntegerProperty()
 
-
 class MainPage(webapp.RequestHandler):
     def get(self):
         self.response.headers['Content-Type'] = 'text/html'
@@ -121,7 +121,9 @@ class MainPage(webapp.RequestHandler):
                     identifier=random.randint(0, 1000000),
                     players_current=0,
                     deck=deck,
-                    common_cards=[])
+                    common_cards=[],
+                    start_time=datetime.datetime.now
+                    + datetime.timedelta(seconds=60))
         game.put()
         self.response.out.write(
                      "<html><body><h2>"
@@ -152,7 +154,13 @@ class JoinPlayer(webapp.RequestHandler):
         cur_player = simplejson.loads(self.request.get("player"))
         # inserts row into games model
         game = (Game.query(Game.identifier == game_id).fetch(1))[0]
-        game.players.append(cur_player["identifier"])
+        if game.players_current == game.players_max:
+            self.response.out.write("Filled");
+            return
+        elif datetime.datetime.now() > game.start_time:
+            self.response.out.write("Started")
+            return
+        game.players.append(cur_player["identifier"]) 
         game.players_current = game.players_current + 1
         game.put()
         # inserts row into players model
@@ -177,7 +185,7 @@ class PlayerStatus(webapp.RequestHandler):
         cur_player = simplejson.loads(self.request.get("player"))
         if int(cur_player["identifier"]) in game.players:
             self.response.out.write("Play")
-        elif game.players_max != game.players_current:
+        elif game.players_max > game.players_current:
             self.response.out.write("Join")
         else:
             self.response.out.write("View")
