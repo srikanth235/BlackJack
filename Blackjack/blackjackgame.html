@@ -1,12 +1,12 @@
 <html>
 <head>
-<title>BlackJack</title>
+<title> BlackJack Game </title>
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.10.0/themes/base/jquery-ui.css" />
 <link rel = "stylesheet" href = "/html/stylesheet.css">
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script src="/html/domevents.js"></script>
-<script src='/_ah/channel/jsapi'></script>
+<script src="/_ah/channel/jsapi"></script>
 <script>
 function renderCards(cards, id) {
     for(var i = 0; i < cards.length; i++) {
@@ -15,8 +15,16 @@ function renderCards(cards, id) {
     }
 }
 
-function renderAction(action, id) {
-    $(id).html("Recent Action:" + action);
+function renderInfo(info, id) {
+    $(info).appendTo(id)
+} 
+
+function renderActions(actions, id) {
+    for(var i = 0; i < actions.length; i++) {
+        var action = actions[i];
+        $("<input type = 'submit' class = 'action' value = '" + action +"'></input>").appendTo(id);
+    }
+    addActionListeners();
 }
 
 function addActionListeners() {
@@ -32,32 +40,59 @@ function addActionListeners() {
                          .done(function(data) {
                                    var player = JSON.parse(data);
                                    $("#tokens").html("Tokens Remaining:" + player.tokens);
-                                   renderCards(player["cards"], '#self');
                                    $("#actions").html("");
-                                   for(var i = 0; i < player["actions"].length; i++) {
-                                       var action = player["actions"][i];
-                                       $("<input type = 'submit' class = 'action' value = '" + action +"'></input>").appendTo('#actions')
-                                   }
                                    addActionListeners();
                               })
                          .fail(function() {alert("failed")})
                     })
 }
-$(document).ready(function() {
-    addActionListeners();
-}); 
+
 </script>
 </head>
 <body>
  <script type="text/javascript">
+ function renderCards(cards, id) {
+    for(var i = 0; i < cards.length; i++) {
+        var card = "/images/deck/" + cards[i] + ".png";
+        $("<img src= '" + card + "'class='card'/>").appendTo(id)
+    }
+ }
+
+ function renderInfo(info, id) {
+    $(info).appendTo(id)
+ } 
+
+ function renderActions(actions, id) {
+    for(var i = 0; i < actions.length; i++) {
+        var action = actions[i];
+        $("<input type = 'submit' class = 'action' value = '" + action +"'></input>").appendTo(id);
+    }
+    addActionListeners();
+ }
   onOpened = function() {
-     
+ 	  alert("Channel Opened")    
   }
+  
   onMessage = function(m) {
      player_data = JSON.parse(m.data);
-     renderCards(player_data["new_cards"], "#" + player_data["id"])
-     renderAction(action, "#" + player_data["id"] + " .recent-action")
+     alert(m.data)
+     // ignore the updates of other games being played
+     if( player_data['game_id'] === '{{game_id}}')
+         return
+
+     if(typeof(player_data['actions']) !== 'undefined') {
+         renderActions(player_data['actions'], '#actions')
+     }
+
+     if(typeof(player_data['new_cards']) !== 'undefined') {
+        renderCards(player_data["new_cards"], "#" + player_data["identifier"])
+     }
+
+     if(typeof(player_data["info"]) !== 'undefined') {
+         renderInfo(player_date['info'], "#" + player_data["identifier"] + " .info")
+     }
   }
+ 
   openChannel = function() {
         var token = '{{ channel_token }}';
         var channel = new goog.appengine.Channel(token);
@@ -65,14 +100,13 @@ $(document).ready(function() {
         socket.onopen = onOpened;
         socket.onmessage = onMessage;
       }
+ 
   setTimeout(openChannel, 100);
  </script>
   <table id ="bjtable" width=100%>
    <tr>
    <td class = "dealer" colspan = {{count}}>
    <div class="card_container" id = "dealer">
-        <div class = "recent-action">
-        </div>
         {% for card in dealer_cards %}
            <img src="/images/deck/{{card}}.png" class="card"/>
         {% endfor %}
@@ -81,8 +115,8 @@ $(document).ready(function() {
    <tr> 
    {% for player in players %} 
        <td>
-        <div class = "recent-action">
-        </div
+        <div class = "info">
+        </div>
        <div class="card_container" id = {{ player.identifier }}>
          {% for card in player.cards %}
             <img src="/images/deck/{{card}}.png" class="card"/>
@@ -92,8 +126,8 @@ $(document).ready(function() {
    {% endfor %}
    {% if cur_player %}
        <td>
-          <div class="card_container" id = "self">
-           <div id = "tokens">
+          <div class="card_container" id = {{ cur_player.identifier }}>
+           <div class = "info" id = "tokens">
                 Tokens Remaining: {{tokens}}
             </div>
             {% for card in cur_player.cards %}
@@ -106,7 +140,7 @@ $(document).ready(function() {
    </tr>
   {% if actions %}
   <tr>
-  <td align = "center" id="actions" colspan = {{count}}>
+  <td align = "center" id = "actions" colspan = {{count}}>
         {% for action in actions %}
            <input type = "submit" class = "action" value = "{{action}}" > </input>
         {% endfor %}
@@ -114,5 +148,8 @@ $(document).ready(function() {
    {% endif %}
   </tr>
 </table>
+<script>
+   addActionListeners();
+</script>
 </body>
 </html>

@@ -9,17 +9,16 @@ function addJoinListener(element, game_id) {
                 var url = "/game/" + game_id +"/playerConnect";
                 $.post(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
-                         alert(localStorage.getItem("player"))
-                        if(data.length > 4) {
-                           element.replaceWith(data);
-                        }
-                        else {
-                           element.val("Play")
-                           element.removeClass("join");
-                           element.addClass("play");
-                           element.unbind("click");
-                           addPlayListener(element, game_id);
-                        }
+                          if(data.length > 4) {
+                              element.replaceWith(data);
+                          }
+                          else {
+                              element.val("Play")
+                              element.removeClass("join");
+                              element.addClass("play");
+                              element.unbind("click");
+                              addPlayListener(element, game_id);
+                          }
                      })
                 .fail(function() {
                          alert("Not able to join the game")
@@ -60,14 +59,13 @@ function populateStatus() {
                     element.html(data)
                 }
             })
-           .fail(function() {$("body").html("Not able to join the game")});
+           .fail(function() {
+               $("body").html("Not able to join the game")
+            });
     })
 }
 
 /* Functions for adding listeners end here */
-$(document).ready(function() {
-    populateStatus();
-}); 
 </script>
 </head>
  <body>
@@ -108,5 +106,8 @@ $(document).ready(function() {
    </tr>
    {% endfor %}
    <br>
+   <script>
+       populateStatus();
+   </script>
  </body>
 </html>
