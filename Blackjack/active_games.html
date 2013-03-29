@@ -9,6 +9,7 @@ function addJoinListener(element, game_id) {
                 var url = "/game/" + game_id +"/playerConnect";
                 $.post(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
+                         alert(localStorage.getItem("player"))
                         if(data.length > 4) {
                            element.replaceWith(data);
                         }
