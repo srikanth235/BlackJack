@@ -75,3 +75,9 @@ img {
     bottom: 0px;
     font-weight: bold;
 }
+
+.recent-action {
+    position: absolute;
+    bottom: 0px;
+    font-weight: bold;
+}

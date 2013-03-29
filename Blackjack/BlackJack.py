@@ -1,12 +1,15 @@
+import simplejson
+import random
+import os
+import threading
+import datetime
+
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp.util import run_wsgi_app
 from google.appengine.ext import ndb
 from google.appengine.ext import db
 from google.appengine.ext.webapp import template
-
-import simplejson
-import random
-import os
+from google.appengine.api import channel
 
 deck = ['2s', '2h', '2d', '2c', '3s', '3h', '3d', '3c',
         '4s', '4h', '4d', '4c', '5s', '5h', '5d', '5c',
@@ -16,6 +19,20 @@ deck = ['2s', '2h', '2d', '2c', '3s', '3h', '3d', '3c',
         'Qs', 'Qh', 'Qd', 'Qc', 'Ks', 'Kh', 'Kd', 'Kc',
         'As', 'Ah', 'Ad', 'Ac']
 
+# Game states
+REGISTERING = "Registering"
+STARTED = "Starting"
+FILLED = "Slots Filled"
+ENDED = "Ended"
+
+# Player states
+JOIN = "Join"
+PLAY = "Play"
+WON = "Won"
+LOST = "Lost"
+VIEW = "View"
+
+client_list =[]
 def get_value(card):
     if card[0] in ['J', 'Q', 'K']:
         return 10
@@ -88,8 +105,7 @@ class Game(ndb.Model):
     common_cards = ndb.StringProperty(repeated=True)
     common_cards_visible = ndb.StringProperty(repeated=True)
     players = ndb.IntegerProperty(repeated=True)
-    status = ndb.StringProperty()
-    start_time = ndb.DateTimeProperty();
+    status = ndb.StringProperty();
 
 
 class Player(ndb.Model):
@@ -107,28 +123,40 @@ class Game_Player_Status(ndb.Model):
     actions_taken = ndb.StringProperty(repeated=True)
     bet = ndb.IntegerProperty()
     hand_value = ndb.IntegerProperty()
+    status = ndb.StringProperty()
 
-class MainPage(webapp.RequestHandler):
+
+class CreateGame(webapp.RequestHandler):
     def get(self):
-        self.response.headers['Content-Type'] = 'text/html'
-        rows = Game.query()
-        path = os.path.join(os.path.dirname(__file__), 'active_games.html')
-        self.response.out.write(template.render(path, {'rows': rows}))
-
-    def post(self):
+        if(self.request.get("name","") == ""):
+            rows = Game.query()
+            path = os.path.join(os.path.dirname(__file__), 'create_game.html')
+            self.response.out.write(template.render(path, {'rows': rows}))
+            return
         game = Game(name=self.request.get("name"),
                     players_max=int(self.request.get("players_max")),
                     identifier=random.randint(0, 1000000),
                     players_current=0,
                     deck=deck,
                     common_cards=[],
-                    start_time=datetime.datetime.now
-                    + datetime.timedelta(seconds=60))
+                    status=REGISTERING)
         game.put()
-        self.response.out.write(
-                     "<html><body><h2>"
-                     + self.request.get("name")
-                     + " created successfully</body></html>")
+
+    
+class DisplayGames(webapp.RequestHandler):
+    def get(self):
+        self.response.headers['Content-Type'] = 'text/html'
+        rows = Game.query()
+        path = os.path.join(os.path.dirname(__file__), 'active_games.html')
+        self.response.out.write(template.render(path, {'rows': rows}))
+
+
+class StartGame(webapp.RequestHandler):
+    def post(self):
+        game = Game.query(Game.identifier == int(self.request.get("game_id"))).fetch(1)[0]
+        game.status = "Started"
+        game.put()
+        self.response.out.write("Done")
 
 
 class CreatePlayer(webapp.RequestHandler):
@@ -154,18 +182,17 @@ class JoinPlayer(webapp.RequestHandler):
         cur_player = simplejson.loads(self.request.get("player"))
         # inserts row into games model
         game = (Game.query(Game.identifier == game_id).fetch(1))[0]
-        if game.players_current == game.players_max:
-            self.response.out.write("Filled");
-            return
-        elif datetime.datetime.now() > game.start_time:
-            self.response.out.write("Started")
-            return
-        game.players.append(cur_player["identifier"]) 
-        game.players_current = game.players_current + 1
-        game.put()
+        if game.status != REGISTERING:
+            return self.redirect("/games")
+        else:
+            game.players.append(cur_player["identifier"]) 
+            game.players_current = game.players_current + 1
+            if game.players_current == game.players_max:
+                game.status = FILLED
+                game.put()
+
         # inserts row into players model
-        player = (Player.query(Player.identifier == 
-                 int(cur_player["identifier"])).fetch(1))[0]
+        player = (Player.query(Player.identifier == int(cur_player["identifier"])).fetch(1))[0]
         player.games.append(game_id)
         player.put()
         # inserts row into Status Player
@@ -174,7 +201,8 @@ class JoinPlayer(webapp.RequestHandler):
                                     cards=[],
                                     actions_taken=[],
                                     bet=0,
-                                    hand_value=0)
+                                    hand_value=0,
+                                    status=PLAY)
         status.put()
 
 
@@ -183,12 +211,16 @@ class PlayerStatus(webapp.RequestHandler):
         game_id = int(game_id)
         game = Game.query(Game.identifier == game_id).fetch(1)[0]
         cur_player = simplejson.loads(self.request.get("player"))
-        if int(cur_player["identifier"]) in game.players:
-            self.response.out.write("Play")
-        elif game.players_max > game.players_current:
-            self.response.out.write("Join")
+        player_id = int(cur_player["identifier"])
+        if player_id in game.players:
+            player_status = Game_Player_Status.query(ndb.AND(
+                            Game_Player_Status.game_id == game_id,
+                            Game_Player_Status.player_id == player_id)).fetch() 
+            self.response.out.write(player_status)
+        elif game.status == REGISTERING:
+            self.response.out.write(JOIN)
         else:
-            self.response.out.write("View")
+            self.response.out.write("-")
 
 
 class VisibleTable(webapp.RequestHandler):
@@ -207,6 +239,10 @@ class VisibleTable(webapp.RequestHandler):
 
 
 class GameAction(webapp.RequestHandler):
+    def multicast(self, message, self_id):
+        for client_id in client_list:
+            if client_id != self_id:
+                channel.send_message(client_id, message)
     def remove_random_card(self, game_id):
         game = Game.query(Game.identifier == game_id).fetch(1)[0]
         random.shuffle(game.deck)
@@ -222,6 +258,7 @@ class GameAction(webapp.RequestHandler):
         game_id = int(game_id)
         action = self.request.get("action", "None")
         player_id = int(simplejson.loads(self.request.get("player"))["identifier"])
+        
         cur_player = Game_Player_Status.query(ndb.AND(
                          Game_Player_Status.game_id == game_id,
                          Game_Player_Status.player_id == player_id)).fetch(1)[0]
@@ -250,6 +287,9 @@ class GameAction(webapp.RequestHandler):
                                    'tokens': player_info.tokens,
                                    'cards': new_cards
                             })
+        self_id = str(game_id)+ '-' + str(player_id)
+        message = simplejson.dumps({'action': action, 'cards': new_cards, 'id': str(player_id)})
+        self.multicast(message, self_id);
         self.response.out.write(player_stringified)
 
 class GamePlay(webapp.RequestHandler):
@@ -273,13 +313,16 @@ class GamePlay(webapp.RequestHandler):
             tokens = player_info.tokens
             dealer_cards = dealer.common_cards_visible
             actions = get_next_action(cur_player, tokens)
+            token_suffix = player_id
         else:
             actions = []
             tokens = None
             dealer_cards = dealer.common_cards
             cur_player = None
+            token_suffix = random.randint(0, 1000000)
         dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
         path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
+        channel_token = channel.create_channel(str(game_id) + "-" + str(token_suffix)) 
         self.response.out.write(template.render(path,
                                   {'players': game_players,
                                    'count': count,
@@ -287,17 +330,34 @@ class GamePlay(webapp.RequestHandler):
                                    'actions': actions,
                                    'tokens': tokens,
                                    'game_id': game_id,
-                                   'cur_player': cur_player
+                                   'cur_player': cur_player,
+                                   'channel_token': channel_token
                                   }))
 
+
+class AddClient(webapp.RequestHandler):
+     def post(self):
+         global client_list
+         client_list.append(self.request.get('from'))
+
+
+class DeleteClient(webapp.RequestHandler):
+     def post(self):
+         global client_list
+         client_list.remove(self.request.get('from'))
+
 app = webapp.WSGIApplication(
-          [('/games', MainPage),
+          [('/create_game', CreateGame),
+          ('/games', DisplayGames),
+          ('/start_game', StartGame),
           ('/player', CreatePlayer),
           (r'/game/(.*)/playerConnect', JoinPlayer),
           (r'/game/(.*)/status', PlayerStatus),
           (r'/game/(.*)/visible_table', GamePlay),
           (r'/game/(.*)/play', GamePlay),
-          (r'/game/(.*)/action', GameAction)],
+          (r'/game/(.*)/action', GameAction),
+          ('/_ah/channel/connected/', AddClient),
+          ('/_ah/channel/disconnected/', DeleteClient)],
            debug=True)
 
 

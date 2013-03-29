@@ -6,12 +6,23 @@
 <script src="http://code.jquery.com/jquery-1.8.3.js"></script>
 <script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
 <script src="/html/domevents.js"></script>
+<script src='/_ah/channel/jsapi'></script>
 <script>
+function renderCards(cards, id) {
+    for(var i = 0; i < cards.length; i++) {
+        var card = "/images/deck/" + cards[i] + ".png";
+        $("<img src= '" + card + "'class='card'/>").appendTo(id)
+    }
+}
+
+function renderAction(action, id) {
+    $(id).html("Recent Action:" + action);
+}
+
 function addActionListeners() {
-    server_url = "http://localhost:8080/";
     $(".action").on("click",
                      function() {
-                         var url = server_url + "game/" +{{game_id}} + "/action";
+                         var url = "/game/" + {{game_id}} + "/action";
                          var str = $(this).val().split(" ")
                          var action = str[0];
                          var value = 0
@@ -21,10 +32,7 @@ function addActionListeners() {
                          .done(function(data) {
                                    var player = JSON.parse(data);
                                    $("#tokens").html("Tokens Remaining:" + player.tokens);
-                                   for(var i = 0; i < player["cards"].length; i++) {
-                                       var card = "/images/deck/" + player["cards"][i] + ".png";
-                                       $("<img src= '" + card + "'class='card'/>").appendTo('#self')
-                                   }
+                                   renderCards(player["cards"], '#self');
                                    $("#actions").html("");
                                    for(var i = 0; i < player["actions"].length; i++) {
                                        var action = player["actions"][i];
@@ -41,10 +49,30 @@ $(document).ready(function() {
 </script>
 </head>
 <body>
+ <script type="text/javascript">
+  onOpened = function() {
+     
+  }
+  onMessage = function(m) {
+     player_data = JSON.parse(m.data);
+     renderCards(player_data["new_cards"], "#" + player_data["id"])
+     renderAction(action, "#" + player_data["id"] + " .recent-action")
+  }
+  openChannel = function() {
+        var token = '{{ channel_token }}';
+        var channel = new goog.appengine.Channel(token);
+        var socket = channel.open();
+        socket.onopen = onOpened;
+        socket.onmessage = onMessage;
+      }
+  setTimeout(openChannel, 100);
+ </script>
   <table id ="bjtable" width=100%>
    <tr>
    <td class = "dealer" colspan = {{count}}>
-   <div class="card_container">
+   <div class="card_container" id = "dealer">
+        <div class = "recent-action">
+        </div>
         {% for card in dealer_cards %}
            <img src="/images/deck/{{card}}.png" class="card"/>
         {% endfor %}
@@ -53,7 +81,9 @@ $(document).ready(function() {
    <tr> 
    {% for player in players %} 
        <td>
-       <div class="card_container">
+        <div class = "recent-action">
+        </div
+       <div class="card_container" id = {{ player.identifier }}>
          {% for card in player.cards %}
             <img src="/images/deck/{{card}}.png" class="card"/>
          {% endfor %}

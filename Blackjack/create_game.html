@@ -1,0 +1,81 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<title>Create BlackJack Game</title>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.0/themes/base/jquery-ui.css" />
+<link rel = "stylesheet" href = "stylesheet.css">
+<script src="http://code.jquery.com/jquery-1.8.3.js"></script>
+<script src="http://code.jquery.com/ui/1.10.0/jquery-ui.js"></script>
+<script> 
+function createGame() {
+   name = $("#name").val();
+   players_max = $("#players_max").val();
+   $.get("/create_game", 
+          {"name" : name, "players_max": players_max})
+   .done(function(data) {
+        window.location.href = "/create_game"; 
+   })
+   .fail(function() {
+        $("body").html("Game creation failed");
+   })
+}
+function createActionListener() {
+      $("body").html(
+               '<table align="left">' +
+               '<tr>' +
+                    '<td>Name: </td>' + 
+                    '<td><input type = "text" id = "name"/></td>' +
+               '</tr>' +
+               '<tr>' +
+                    '<td>Max Players:</td>' + 
+                    '<td><input type = "text" id = "players_max"/></td>' +
+               '</tr>' +
+               '<tr>' +
+               '<td colspan = "2" align = "center">'+
+                   '<input onclick = createGame() type = "submit"/>'+
+               '</td>'+
+               '</tr>'+
+              '</table>'
+      );
+}
+function sendPlayRequest(game_id) {
+    $.post("/start_game", {"game_id": game_id})
+    .done(function(data) {$("#"+game_id).replaceWith("Started");})
+    .fail(function() { alert("failed"); })
+}
+</script>
+</head>
+<body>
+   <table border = 1>
+   <tr>
+   <th>
+     Game Name
+   </th>
+   <th>
+     Game ID
+   </th>
+   <th>
+     Max Players
+   </th>
+   <th>
+     Game Status
+   </th>
+   </tr>
+   {% for game in rows %}
+   <tr class = "game">
+       <td> {{ game.name }} </td>
+       <td class = "game_id"> {{ game.identifier }} </td>
+       <td> {{ game.players_max }} </td>
+       <td> 
+       {% if game.status == "Registering" or game.status == "Slots Filled"%}	
+       <input type = "submit" id = "{{game.identifier}}" onclick = "sendPlayRequest({{game.identifier}})" value = "Start" /> </td>
+       {% else %}
+       {{game.status}}
+       {% endif %}
+       </td>
+   </tr>
+   {% endfor %}
+   </table>
+   <input style="margin-left:75px;" type = "submit" id = "create_game" onclick = createActionListener() value = "Create New Game"/>
+</body>
+</html>

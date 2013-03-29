@@ -13,8 +13,8 @@ function registerPlayer() {
    var avatar_url = $("#avatar_url").val();
    $.post("/player", {"name" : name, "tokens" : tokens, "avatar_url": avatar_url})
    .done(function(data) {
-        $("body").html("Player crerated successfully");
-        localStorage.setItem("player", data); 
+        localStorage.setItem("player", data);
+        window.location.href = "/games"
    })
    .fail(function() {
         $("body").html("Player creation failed");

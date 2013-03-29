@@ -31,22 +31,12 @@ function addPlayListener(element, game_id) {
                 var url = "/game/" + parseInt(game_id) +"/play";
                 $.get(url, {"player":localStorage.getItem("player")})
                 .done(function(data) {
-                        $("body").replaceWith(data)
+                        $("body").html(data)
                      })
                 .fail(function() {
                          alert("Not able to join the game")
                      })
                 });
-}
-
-function createFormHTML(submitValue, game_id) {
-     var url = "/game/" + parseInt(game_id) + "/action"; 
-     var html = "<form method = 'post' action = " 
-                +  url + ">"
-                + "<input type = 'hidden' name = 'player' value = " + localStorage.getItem("player") + "/>"
-                + "<input type = 'submit' value = " + submitValue + "></input" 
-                + "</form>"
-    return html;
 }
 
 function populateStatus() {
@@ -61,11 +51,12 @@ function populateStatus() {
                     element.html("<input type= 'submit' value ='Join' ></input>")
                     element.children().addClass("join")
                     addJoinListener(element.children(), game_id)
-                } else {
+                } else if(data === "Play") {
                     element.html("<input type= 'submit' value ='Play' ></input>")
                     element.children().addClass("play")
                     addPlayListener(element.children(), game_id)
-                //    element.html(createFormHTML("Play", game_id))
+                } else {
+                    element.html(data)
                 }
             })
            .fail(function() {$("body").html("Not able to join the game")});
@@ -79,6 +70,10 @@ $(document).ready(function() {
 </script>
 </head>
  <body>
+ <script>
+   if(! ("player" in localStorage)) 
+    window.location.href = "/html/create_player.html"
+ </script>
    {{desc}}
    <table border = 1>
    <tr>
@@ -95,7 +90,10 @@ $(document).ready(function() {
      Max Players
    </th>
    <th>
-     Status
+     Game Status
+   </th>
+   <th>
+     Player Status
    </th>
    </tr>
    {% for game in rows %}
@@ -104,6 +102,7 @@ $(document).ready(function() {
        <td class = "game_id"> <a href = "/game/{{game.identifier}}/visible_table" >{{ game.identifier }} </a></td>
        <td> {{ game.players_current }} </td>
        <td> {{ game.players_max }} </td>
+       <td> {{ game.status }} </td>
        <td class = "status"></td>
    </tr>
    {% endfor %}
