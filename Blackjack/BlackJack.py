@@ -21,17 +21,20 @@ deck = ['2s', '2h', '2d', '2c', '3s', '3h', '3d', '3c',
 
 # Game states
 REGISTERING = "Registering"
-STARTED = "Starting"
 FILLED = "Slots Filled"
+STARTED = "Started"
+DEALER_COMPLETED = "Dealer Completed"
 ENDED = "Ended"
 
 # Player states
 JOIN = "Join"
 PLAY = "Play"
+END = "End"
 WON = "Won"
 LOST = "Lost"
 VIEW = "View"
 TIE = "Tie"
+STOP = "Stop"
 
 YES = "Yes"
 NO = "No"
@@ -42,7 +45,10 @@ round_players = {}
 def get_value(card):
     if card[0] in ['J', 'Q', 'K']:
         return 10
-    return int(card[0])
+    if len(card) == 2:
+        return int(card[0])
+    else:
+        return int(card[0:2])
 
 def has_only_bet(actions):
     for action in actions:
@@ -68,7 +74,7 @@ def get_hand_value(cards):
     value = 0
     num_aces = 0
     for card in cards:
-        if 'A' != card:
+        if 'A' != card[0]:
             value = value + get_value(card)
         else:
             num_aces = num_aces + 1
@@ -84,11 +90,11 @@ def get_hand_value(cards):
 
 def get_next_action(player, tokens):
     prev_actions = player.actions_taken
-    hand_value = player.hand_value
+    hand_value = get_hand_value(player.cards)
     player_bet = player.bet
     actions = []
     if hand_value >= 21:
-        actions = []
+        return []
     elif len(prev_actions) == 0 or has_only_bet(prev_actions):
         actions = actions + get_bet_actions(tokens)
         if len(prev_actions) > 0:
@@ -101,6 +107,8 @@ def get_next_action(player, tokens):
         actions = [ "Hit"]
     elif prev_actions[-1] == "Hit" and "Double" in prev_actions:
         actions = ["Stand"]
+    elif prev_actions[-1] == "Stand":
+        actions = []
     else:
         actions = ["Hit", "Stand"]
     return actions
@@ -115,7 +123,10 @@ def get_server_move(cards):
         return ["Hit"]
 
 def broadcast(message, client_id=-1):
-    if(client_id !=-1):
+    clients = []
+    #self.response.out.write("Checking " + message)
+    #self.response.out.write("Client list:" + client_list)
+    if(client_id !=-1 and client_id in client_list):
         clients = [client_id]
     else:
         clients = client_list
@@ -123,7 +134,7 @@ def broadcast(message, client_id=-1):
         channel.send_message(client_id, message)
 
 def remove_random_card(game_id):
-    game = retrieve_dealer_entity(game_id)
+    game = retrieve_game_entity(game_id)
     random.shuffle(game.deck)
     card = game.deck.pop()
     game.put()
@@ -137,62 +148,87 @@ def retrieve_game_player_entity(game_id, player_id):
 def retrieve_player_entity(player_id):
     return Player.query(Player.identifier == player_id).fetch(1)[0]
     
-def retrieve_dealer_entity(game_id):
+def retrieve_game_entity(game_id):
     return Game.query(Game.identifier == game_id).fetch(1)[0]
 
-def update_game_player_entity(player, bet, cards, action):
-    player.bet = bet
-    player.cards = cards
-    player.hand_value = get_hand_value(cards)
-    player.actions_taken.append(action)
-    next_actions = get_next_action(cur_player, player_info.tokens)
-    if len(next_actions) == 0:
-        cur_player.can_play = NO
-    cur_player.put()
-    return next_actions
+def update_game_player_entity(game_player):
+    game_player.put()
 
-def update_player_info(player_info, value):
-    player_info.tokens =  value
-    player_info.put()
+def update_player_entity(player):
+    player.put()
 
-def update_game_entity(game_id, players=None, players_current=None, status=None):
-    game = retrieve_dealer_entity(game_id)
-    if players:
-        game.players = players
-    if players_current:
-        game.players_current = players_current
-    if status:
-        game.status = status
+def update_game_entity(game):
     game.put()
-    
-    
-def update_player_status(player_id=-1, game_id):
-        status = WON
-        dealer_cards = ((Game.query(Game.identifier==game_id).
-                   fetch(0))[1]).common_cards
-        dealer_value = get_hand_value(dealer_cards)
+
+def get_client_id(game_id, player_id):
+    return str(game_id) + "-" + str(player_id)
+
+def calc_player_result(dealer, game_player):
+    dealer_value = get_hand_value(dealer.common_cards)
+    player_value = get_hand_value(game_player.cards)
+    if dealer_value == player_value:
+        return 0, TIE
+    elif player_value == 1000:
+        return 0, LOST
+    elif dealer_value == 1000:
+        return game_player.bet, WON
+    elif dealer_value > player_value:
+        return 0, LOST
+    else:
+        return game_player.bet, WON
+
+def update_game_status(game_id):
+    remaining_players = Game_Player_Status.query(ndb.AND(
+                            Game_Player_Status.game_id == game_id,
+                            Game_Player_Status.status == PLAY
+                        )).fetch()
+    game = retrieve_game_entity(game_id)
+    if len(remaining_players) == 0 and game.status == DEALER_COMPLETED:
+        game.status = ENDED
+        update_game_entity(game)
+
+def update_game(game_id, player_id=-1):
+        player_id = int(player_id)
+        game_id = int(game_id)
+        dealer = retrieve_game_entity(game_id)
+        dealer_cards = dealer.common_cards
         if player_id == -1:
-            players = Game_Player_Status.query(
-                        Game_Player_Status.game_id == game_id)
+            game_players = Game_Player_Status.query(
+                        Game_Player_Status.game_id == game_id).fetch()
         else:
-            players = Game_Player_Status.query(ndb.AND(
-                        Game_Player_Status.game_id == game_id,
-                        Game_Player_Status.player_id == player_id)).fetch()
-        for player in players:
-            if player.can_play == NO:
-                cur = Player.query(Player.identifier==player_id).fetch(1)[0]
-                player_value = get_hand_value(player.cards)
-                if player_value == dealer_value:
-                    player.status = TIE
-                    cur.tokens = cur.tokens + player.bet
-                    cur.put()
-                elif player_value == 1000:
-                    player.status = LOST
-                elif dealer_value == 1000:
-                    player.status = WON
-                    cur.tokens = cur.tokens + 2 * player.bet
-                    cur.put()
-                player.put()
+            game_players = [retrieve_game_player_entity(game_id, player_id)];
+        status = ""
+        for game_player in game_players:
+            player = retrieve_player_entity(game_player.player_id)
+            player_id = player.identifier
+            client_id = get_client_id(game_id, player_id)
+            if game_player.status == STOP and dealer.status == DEALER_COMPLETED:
+                win_tokens, status = calc_player_result(dealer, game_player)
+                player.tokens = player.tokens + 2*win_tokens
+                game_player.status = status
+                if win_tokens > 0:
+                    update_player_entity(player)
+                    message = simplejson.dumps({
+                                            'game_id': str(game_id),
+                                            'player_id': str(player_id),
+                                            'tokens': player.tokens
+                                           })
+                    broadcast(message, client_id)
+                if status in [WON, LOST, TIE]:
+                    message = simplejson.dumps({'game_id': str(game_id),
+                                                'player_id': str(player_id),
+                                                'status': status
+                                           })
+                    broadcast(message)
+            elif game_player.status == PLAY:
+                actions = get_next_action(game_player, player.tokens);
+                message = simplejson.dumps({'game_id': str(game_id),
+                                            'player_id': str(player_id),
+                                            'actions': actions })
+                broadcast(message, client_id)
+                game_player.can_play = YES
+            update_game_player_entity(game_player)
+        update_game_status(game_id)
         return status
 
 class Game(ndb.Model):
@@ -202,10 +238,9 @@ class Game(ndb.Model):
     players_current = ndb.IntegerProperty()
     deck = ndb.StringProperty(repeated=True)
     common_cards = ndb.StringProperty(repeated=True)
-    common_cards_visible = ndb.StringProperty(repeated=True)
+    common_cards_invisible = ndb.StringProperty(repeated=True)
     players = ndb.IntegerProperty(repeated=True)
     status = ndb.StringProperty()
-    can_play = ndb.StringProperty()
 
 
 class Player(ndb.Model):
@@ -240,9 +275,9 @@ class CreateGame(webapp.RequestHandler):
                     players_current=0,
                     deck=deck,
                     common_cards=[],
-                    status=REGISTERING,
-                    can_play=YES)
-        game.put()
+                    common_cards_invisible=[],
+                    status=REGISTERING)
+        update_game_entity(game)
 
     
 class DisplayGames(webapp.RequestHandler):
@@ -256,17 +291,22 @@ class DisplayGames(webapp.RequestHandler):
 class StartGame(webapp.RequestHandler):
     def post(self):
         game_id = int(self.request.get("game_id"))
-        game = retrieve_dealer_entity(game_id)
+        game = retrieve_game_entity(game_id)
         game.status = "Started"
-        game.put()
+        new_cards = []
+        new_cards.append(remove_random_card(game_id))
+        new_cards.append(remove_random_card(game_id))
+        game.common_cards = []
+        game.common_cards_invisible = new_cards
+        update_game_entity(game)
         global round_players
         players = []
         game_players = Game_Player_Status.query(
-                       Game.identifier == int(self.request.get("game_id"))).fetch()
+                       Game_Player_Status.game_id == game_id).fetch()
         for player in game_players:
-            players.append(player)
+            players.append(player.player_id)
         round_players[game_id] = players
-        self.response.out.write("Done")
+       # self.response.out.write(round_players[game_id])
 
 
 class CreatePlayer(webapp.RequestHandler):
@@ -276,7 +316,7 @@ class CreatePlayer(webapp.RequestHandler):
                     avatar_url=self.request.get("avatar_url"),
                     tokens=int(self.request.get("tokens"))
                  )
-        player.put()
+        update_player_entity(player)
         player_stringified = simplejson.dumps({
                                  'name': player.name,
                                  'identifier': player.identifier,
@@ -290,41 +330,40 @@ class JoinPlayer(webapp.RequestHandler):
         game_id = int(game_id)
         player_id = simplejson.loads(self.request.get("player"))["identifier"]
         player_id = int(player_id)
-
         # inserts row into games model
-        game = retrieve_dealer_entity(game_id)
+        game = retrieve_game_entity(game_id)
         if game.status != REGISTERING:
             return self.redirect("/games")
         else:
-            players = game.players
-            players.append(player_id) 
-            players_current = game.players_current + 1
-            status = game.status
-            if players_current == game.players_max:
-                status = FILLED
-            update_game_entity(game_id, players, players_current, status)
+            game.players.append(player_id) 
+            game.players_current = game.players_current + 1
+            if game.players_current == game.players_max:
+                game.status = FILLED
+            update_game_entity(game)
 
         # inserts row into players model
         player = retrieve_player_entity(player_id)
         player.games.append(game_id)
-        player.put()
+        update_player_entity(player)
 
         # inserts row into Status Player
-        status = Game_Player_Status(game_id=game_id,
-                                    player_id=player.identifier,
-                                    cards=[],
-                                    actions_taken=[],
-                                    bet=0,
-                                    hand_value=0,
-                                    status=PLAY,
-                                    can_play=YES)
-        status.put()
+        game_player = Game_Player_Status(game_id=game_id,
+                                         player_id=player.identifier,
+                                         cards=[],
+                                         actions_taken=[],
+                                         bet=0,
+                                         hand_value=0,
+                                         status=PLAY,
+                                         can_play=YES)
+        message = simplejson.dumps({'game_id': str(game_id),'player_id': str(player_id), 'join': 'joined'})
+        broadcast(message)
+        update_game_player_entity(game_player)
 
 
 class PlayerStatus(webapp.RequestHandler):
     def post(self, game_id):
         game_id = int(game_id)
-        game = retrieve_dealer_entity(game_id)
+        game = retrieve_game_entity(game_id)
         cur_player = simplejson.loads(self.request.get("player"))
         player_id = int(cur_player["identifier"])
         if player_id in game.players:
@@ -333,7 +372,7 @@ class PlayerStatus(webapp.RequestHandler):
         elif game.status == REGISTERING:
             self.response.out.write(JOIN)
         else:
-            self.response.out.write("view")
+            self.response.out.write("Can only view")
 
 
 class VisibleTable(webapp.RequestHandler):
@@ -342,7 +381,7 @@ class VisibleTable(webapp.RequestHandler):
         game_players = Game_Player_Status.query(
                            Game_Player_Status.game_id == game_id).fetch()
         count = len(game_players)
-        dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
+        dealer = retrieve_game_entity(game_id)
         path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
         self.response.out.write(template.render(path,
                                     {'players': game_players,
@@ -352,79 +391,88 @@ class VisibleTable(webapp.RequestHandler):
 
 
 class GameAction(webapp.RequestHandler):
-    def wake_up_server(self, player_id, game_id):
-        round_players[game_id].remove(player_id)
+    global round_players
+    def wake_up_server(self, game_id, player_id=-1):
+        if player_id != -1:
+            round_players[game_id].remove(player_id)
         #does server need to play
         if len(round_players[game_id]) == 0:
-            dealer = retrieve_dealer_entity(game_id)
-            action = get_server_move(dealer.common_cards)
+            game = retrieve_game_entity(game_id)
+            action = get_server_move(game.common_cards)
             new_cards = []
-            if action == "Deal":
-                new_cards.append(self.remove_random_card(game_id))
-                new_cards.append(self.remove_random_card(game_id))
-            elif action == "Hit":
-                new_cards.append(self.remove_random_card(game_id))
-            message = simplejson.dumps({
-                            'game_id': game_id,
-                            'action': action,
+            if len(game.common_cards_invisible) > 0:
+                new_cards = game.common_cards_invisible
+                game.common_cards_invisible = []
+            else:
+                new_cards.append(remove_random_card(game_id))
+            message = simplejson.dumps({    
+                            'game_id': str(game_id),
                             'cards': new_cards,
-                            'id': 'dealer'})
+                            'player_id': 'dealer'})
             broadcast(message);
             game.common_cards = game.common_cards + new_cards
-            if len(get_server_move(game.common_cards)) == 0:
-                game.can_play = NO
-                update_player_status(game_id, player_id)
-            game.put() 
-    
-    
+            if get_hand_value(game.common_cards) >= 17:
+                game.status = DEALER_COMPLETED
+            update_game_entity(game)
+            update_game(game_id)
+            player_list = Game_Player_Status.query(ndb.AND(
+                                        Game_Player_Status.game_id == game_id,
+                                        Game_Player_Status.status == PLAY
+                                        )).fetch()
+            round_players[game_id] = [] 
+            for player in player_list:
+                round_players[game_id].append(player.player_id)
+            if len(round_players[game_id]) == 0 and get_hand_value(game.common_cards) < 17:
+                self.wake_up_server(game_id, -1)
+
     def post(self, game_id):
         game_id = int(game_id)
-        action = self.request.get("action", "None")
+        action = self.request.get("action")
         player_id = int(simplejson.loads(self.request.get("player"))["identifier"])
-        value = int(self.request.get("value", 2 * cur_player.bet))        
-        
-        cur_player = retrieve_game_player_entity(game_id, player_id)
-        new_cards = cur_player.cards
-        new_bet = cur_player.bet 
-        
-        player_info = retrieve_player_entity(player_id)
-        tokens = player_info.tokens
-        
-        dealer = (Game.query(Game.identifier == game_id).fetch(1))[0]
-
+        game_player = retrieve_game_player_entity(game_id, player_id)
+        value = int(self.request.get("value", 2 * game_player.bet))   
+        player = retrieve_player_entity(player_id)
+        new_cards = []
+        tokens = player.tokens
+        dealer = retrieve_game_entity(game_id)
         if action.startswith("Bet") or action == "Double":
-            self.update_player_info(player_info, tokens - value)           
-            new_bet = new_bet + value
+            player.tokens = tokens - value
+            update_player_entity(player)           
+            game_player.bet = game_player.bet + value
         elif action == "Deal":
-            new_cards.append(self.remove_random_card(game_id))
-            new_cards.append(self.remove_random_card(game_id))
+            new_cards.append(remove_random_card(game_id))
+            new_cards.append(remove_random_card(game_id))
         elif action == "Hit":
-            new_cards.append(self.remove_random_card(game_id))
-
-        next_actions = self.update_game_player_entity(cur_player, new_bet, new_cards, action)
+            new_cards.append(remove_random_card(game_id))
+        if dealer.status == DEALER_COMPLETED or (not action.startswith("Bet")):
+            game_player.can_play = NO
+        else:
+            game_player.can_play = YES
         
-        if len(next_actions) > 0 and dealer.can_play == NO:
-            message = simplejson.dumps({"game_id": game_id, "actions": next_actions})
-            broadcast(message, player_id)
-
+        game_player.cards = game_player.cards + new_cards
+        game_player.actions_taken.append(action)
+        if len(get_next_action(game_player, tokens)) == 0:
+            game_player.status = STOP
+            game_player.can_play = NO
+        update_game_player_entity(game_player)
         player_stringified = simplejson.dumps({
-                                   'tokens': player_info.tokens,
+                                'game_id': str(game_id),
+                                'player_id': str(player_id),
+                                'status': game_player.status,
+                                'cards': new_cards
                             })
-
-        if not action.startswith("Bet") and dealer.can_play == YES:
-            wake_up_server(game_id, str(game_id) + "-" + str(player_id))
-
-        if cur_player.can_play == NO and dealer.can_play == NO:
-            status = self.update_player_status(player_id, game_id)
-            message = simplejson.dumps({"game_id": game_id, "player_id": player_id, "status": status})
-            broadcast(message)
-
-        self.response.out.write(player_stringified)
+        broadcast(player_stringified)
+        self.response.out.write(simplejson.dumps({'game_id': game_id, 'player_id': player_id, 'tokens': player.tokens}))
+        if dealer.status == DEALER_COMPLETED or game_player.can_play == YES:
+                status = update_game(game_id, player_id)
+        else:
+            self.wake_up_server(game_id, player_id)
 
 class GamePlay(webapp.RequestHandler):
     def get(self, game_id):
         game_id = int(game_id)
         is_anonymous = True
+        player_id = -1
         if(self.request.get("player", "-1") != "-1"):
             player_id = int(simplejson.loads(self.request.get("player"))
                             ["identifier"])
@@ -433,21 +481,22 @@ class GamePlay(webapp.RequestHandler):
         game_players = Game_Player_Status.query(ndb.AND(
                           Game_Player_Status.game_id == game_id)).fetch()
         count = len(game_players)
-        dealer = retrieve_dealer_entity(game_id)
+        dealer = retrieve_game_entity(game_id)
 
         actions = []
         if not is_anonymous:
             cur_player = retrieve_game_player_entity(game_id, player_id)
             player_info = retrieve_player_entity(player_id)
-            dealer_cards = dealer.common_cards_visible
+            tokens = player_info.tokens
+            dealer_cards = dealer.common_cards
             if cur_player.can_play == YES:
                 actions = get_next_action(cur_player, tokens)
             token_suffix = player_id
-        else:            
-            tokens = None
-            dealer_cards = dealer.common_cards
+        else:
+            dealer_cards = dealer.common_cards + dealer.common_cards_invisible
             cur_player = None
             token_suffix = random.randint(0, 1000000)
+            tokens = 0
 
         path = os.path.join(os.path.dirname(__file__), 'blackjackgame.html')
         channel_token = channel.create_channel(str(game_id) + "-" + str(token_suffix)) 
@@ -457,8 +506,8 @@ class GamePlay(webapp.RequestHandler):
                                    'dealer_cards': dealer_cards,
                                    'actions': actions,
                                    'tokens': tokens,
+                                   'cur_player_id': player_id,
                                    'game_id': game_id,
-                                   'cur_player': cur_player,
                                    'channel_token': channel_token
                                   }))
 
@@ -477,7 +526,7 @@ class DeleteClient(webapp.RequestHandler):
          client_list.remove(self.request.get('from'))
 
 app = webapp.WSGIApplication(
-          [('/create_game', CreateGame),
+          [('/create_game', CreateGame) ,
           ('/games', DisplayGames),
           ('/start_game', StartGame),
           ('/player', CreatePlayer),

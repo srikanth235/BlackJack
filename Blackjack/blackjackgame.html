@@ -8,16 +8,13 @@
 <script src="/html/domevents.js"></script>
 <script src="/_ah/channel/jsapi"></script>
 <script>
+id = 0
 function renderCards(cards, id) {
     for(var i = 0; i < cards.length; i++) {
         var card = "/images/deck/" + cards[i] + ".png";
         $("<img src= '" + card + "'class='card'/>").appendTo(id)
     }
 }
-
-function renderInfo(info, id) {
-    $(info).appendTo(id)
-} 
 
 function renderActions(actions, id) {
     for(var i = 0; i < actions.length; i++) {
@@ -27,8 +24,12 @@ function renderActions(actions, id) {
     addActionListeners();
 }
 
+function renderTokens(tokens, id) {
+    $(id).html("Tokens Remaining:" + tokens);
+}
+
 function addActionListeners() {
-    $(".action").on("click",
+      $(".action").on("click",
                      function() {
                          var url = "/game/" + {{game_id}} + "/action";
                          var str = $(this).val().split(" ")
@@ -39,17 +40,25 @@ function addActionListeners() {
                          $.post(url, {"action":action, "value":value, "player":localStorage.getItem("player")})
                          .done(function(data) {
                                    var player = JSON.parse(data);
-                                   $("#tokens").html("Tokens Remaining:" + player.tokens);
+                                   renderTokens(player["tokens"], "#tokens")
                                    $("#actions").html("");
-                                   addActionListeners();
                               })
                          .fail(function() {alert("failed")})
                     })
 }
 
+function addNewPlayer(player_id) {
+    var html = "<td><div class = 'info'>" 
+             + "</div>"
+             + "<div class='card_container' id =" 
+             + player_id
+             + "></div>"
+             + "</td>"
+    $(html).appendTo(".players")
+}
 </script>
 </head>
-<body>
+<body> 
  <script type="text/javascript">
  function renderCards(cards, id) {
     for(var i = 0; i < cards.length; i++) {
@@ -58,7 +67,7 @@ function addActionListeners() {
     }
  }
 
- function renderInfo(info, id) {
+ function renderStatus(info, id) {
     $(info).appendTo(id)
  } 
 
@@ -69,27 +78,35 @@ function addActionListeners() {
     }
     addActionListeners();
  }
-  onOpened = function() {
- 	  alert("Channel Opened")    
+  
+  onOpened = function() {  
+      alert("opened")  
   }
   
+  onClose = function() {  
+      alert("closed")  
+  }
   onMessage = function(m) {
+     localStorage.setItem(id, m)
      player_data = JSON.parse(m.data);
-     alert(m.data)
-     // ignore the updates of other games being played
-     if( player_data['game_id'] === '{{game_id}}')
-         return
+     
+     if('join' in player_data)
+         addNewPayer(player_data['player_id'])
 
-     if(typeof(player_data['actions']) !== 'undefined') {
+     if('actions' in player_data) {
          renderActions(player_data['actions'], '#actions')
      }
 
-     if(typeof(player_data['new_cards']) !== 'undefined') {
-        renderCards(player_data["new_cards"], "#" + player_data["identifier"])
+     if('cards' in player_data) {
+        renderCards(player_data['cards'], "#" + player_data['player_id'])
      }
 
-     if(typeof(player_data["info"]) !== 'undefined') {
-         renderInfo(player_date['info'], "#" + player_data["identifier"] + " .info")
+     if('status' in player_data) {
+         renderStatus(player_data['status'], '#' + player_data['player_id'] + ' .info')
+     }
+     
+     if('tokens' in player_data) {
+         renderTokens(player_data['tokens'], '#tokens')
      }
   }
  
@@ -99,11 +116,12 @@ function addActionListeners() {
         var socket = channel.open();
         socket.onopen = onOpened;
         socket.onmessage = onMessage;
+       // socket.onclose = onClose;
       }
  
   setTimeout(openChannel, 100);
  </script>
-  <table id ="bjtable" width=100%>
+  <table id ="bjtable" width=100% border = 1>
    <tr>
    <td class = "dealer" colspan = {{count}}>
    <div class="card_container" id = "dealer">
@@ -112,32 +130,26 @@ function addActionListeners() {
         {% endfor %}
    </div>
    </tr>
-   <tr> 
+   <tr class = "players"> 
    {% for player in players %} 
        <td>
-        <div class = "info">
-        </div>
-       <div class="card_container" id = {{ player.identifier }}>
+       <div class="card_container" id = {{ player.player_id }}>
+          {% if player.player_id == cur_player_id%}
+              <div class = "info" id = "tokens">
+              Tokens Remaining:  {{tokens}} 
+          {% else %}
+              <div class = "info">
+          {% endif %}
+           {% if player.status == "Win" or player.status == "Lost" %}
+                <br>Result: {{player.status}}
+           {% endif %}
+          </div>
          {% for card in player.cards %}
             <img src="/images/deck/{{card}}.png" class="card"/>
          {% endfor %}
        </div>
        </td>
    {% endfor %}
-   {% if cur_player %}
-       <td>
-          <div class="card_container" id = {{ cur_player.identifier }}>
-           <div class = "info" id = "tokens">
-                Tokens Remaining: {{tokens}}
-            </div>
-            {% for card in cur_player.cards %}
-              <img src="/images/deck/{{card}}.png" class="card"/>
-            {% endfor %}
-          </div>
-          
-       </td>
-   {% endif%}
-   </tr>
   {% if actions %}
   <tr>
   <td align = "center" id = "actions" colspan = {{count}}>
