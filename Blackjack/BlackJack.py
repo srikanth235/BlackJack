@@ -324,7 +324,6 @@ class StartGame(webapp.RequestHandler):
         new_cards.append(remove_random_card(game_id))
         new_cards.append(remove_random_card(game_id))
         game.common_cards = []
-        new_cards = [ '2s', '2h']
         game.common_cards_invisible = new_cards
         update_game_entity(game)
         global round_players

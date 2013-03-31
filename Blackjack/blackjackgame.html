@@ -68,7 +68,7 @@ function addNewPlayer(player_id) {
  }
 
  function renderStatus(info, id) {
-    alert("You " + info);
+    info = "<html><br>Game Status:" + info + "</html>"
     $(info).appendTo(id)
  }
 
@@ -79,13 +79,11 @@ function addNewPlayer(player_id) {
     }
     addActionListeners();
  }
-  
+
   onOpened = function() {  
-      //alert("opened")  
   }
-  
-  onClose = function() {  
-      alert("closed")  
+
+  onClose = function() {
   }
 
   onMessage = function(m) {
@@ -104,7 +102,7 @@ function addNewPlayer(player_id) {
      }
 
      if('status' in player_data) {
-         renderStatus(player_data['status'], '#tokens')
+         renderStatus(player_data['status'], '.' + player_data['player_id'])
      }
      
      if('tokens' in player_data) {
@@ -137,7 +135,7 @@ function addNewPlayer(player_id) {
        <td>
        <div class="card_container" id = {{ player.player_id }}>
           {% if player.player_id == cur_player_id%}
-              <div class = "info" id = "tokens">
+              <div class = "info {{ player.player_id }}" id = "tokens">
               Tokens Remaining:  {{tokens}} 
           {% else %}
               <div class = "info">
