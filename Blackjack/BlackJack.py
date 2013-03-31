@@ -162,9 +162,6 @@ def retrieve_player_entity(player_id):
 
 
 def retrieve_game_entity(game_id):
-    game = memcache.get(str(game_id))
-    if game is not None:
-        return game
     return Game.query(Game.identifier == game_id).fetch(1)[0]
 
 
@@ -182,7 +179,7 @@ def update_player_entity(player):
 @ndb.transactional
 def update_game_entity(game):
     game.put()
-    memcache.add(str(game.identifier), game, 5)
+    memcache.add(str(game.identifier), game, 1)
 
 
 def get_client_id(game_id, player_id):
@@ -327,6 +324,7 @@ class StartGame(webapp.RequestHandler):
         new_cards.append(remove_random_card(game_id))
         new_cards.append(remove_random_card(game_id))
         game.common_cards = []
+        new_cards = [ '2s', '2h']
         game.common_cards_invisible = new_cards
         update_game_entity(game)
         global round_players
@@ -456,8 +454,10 @@ class GameAction(webapp.RequestHandler):
             for player in player_list:
                 round_players[game_id].append(player.player_id)
             hvalue = get_hand_value(game.common_cards)
-            if len(round_players[game_id]) == 0 and hvalue < 17:
-                self.wake_up_server(game_id, -1)
+            if len(round_players[game_id]) == 0: 
+                if hvalue < 17:
+                    self.wake_up_server(game_id, -1)
+            
 
     def post(self, game_id):
         game_id = int(game_id)
