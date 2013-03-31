@@ -45,6 +45,18 @@ function addActionListeners() {
                               })
                          .fail(function() {alert("failed")})
                     })
+
+      $(".chat-box").keyup(function(event){
+            if(event.keyCode == 13){
+                    var input = "Player " + {{cur_player_id}} + ": " + $(this).val();
+                    alert(input)
+                    $.post("/chat", {"text": input})
+                    .done(function(data) {
+                         })
+                    .fail(function() {
+                    })
+            }
+      });
 }
 
 function addNewPlayer(player_id) {
@@ -56,6 +68,12 @@ function addNewPlayer(player_id) {
              + "</td>"
     $(html).appendTo(".players")
 }
+
+function addNewChatInput(text) {
+    var updated_chat = $(".chat-content").val() + "\n" + text 
+    $(".chat-content").val(updated_chat);
+}
+
 </script>
 </head>
 <body> 
@@ -90,6 +108,9 @@ function addNewPlayer(player_id) {
      localStorage.setItem(id, m)
      player_data = JSON.parse(m.data);
      
+     if('chat' in player_data) 
+         addNewChatInput(player_data['chat']);
+
      if('join' in player_data)
          addNewPayer(player_data['player_id'])
 
@@ -159,6 +180,14 @@ function addNewPlayer(player_id) {
    </td>
    {% endif %}
   </tr>
+  <tr>
+   <td colspan = {{count}}>
+       <textarea readonly class="chat-content">
+       </textarea>
+       <br>
+       <input type = "textbox" class="chat-box"></input>
+   </td>
+   </tr>
 </table>
 <script>
    addActionListeners();

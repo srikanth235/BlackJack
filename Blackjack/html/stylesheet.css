@@ -81,3 +81,19 @@ img {
     bottom: 0px;
     font-weight: bold;
 }
+
+.chat-content {
+    border:2px solid #456879;
+	border-radius:10px;
+	height: 100px;
+    width: 100%
+}
+
+.chat-box {
+    font-size: small;
+    height: 25px;
+    width: 100%;
+    oveflow: auto;
+    border:2px solid #456879;
+	border-radius:10px;
+}

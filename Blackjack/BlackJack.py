@@ -561,6 +561,13 @@ class DeleteClient(webapp.RequestHandler):
         global client_list
         client_list.remove(self.request.get('from'))
 
+
+class HandleChat(webapp.RequestHandler):
+    def post(self):
+        message = simplejson.dumps({"chat": self.request.get("text")})
+        broadcast(message)
+
+
 app = webapp.WSGIApplication(
           [('/create_game', CreateGame),
           ('/games', DisplayGames),
@@ -572,7 +579,8 @@ app = webapp.WSGIApplication(
           (r'/game/(.*)/play', GamePlay),
           (r'/game/(.*)/action', GameAction),
           ('/_ah/channel/connected/', AddClient),
-          ('/_ah/channel/disconnected/', DeleteClient)],
+          ('/_ah/channel/disconnected/', DeleteClient),
+          ('/chat', HandleChat)],
            debug=True)
 
 
