@@ -10,6 +10,7 @@ from google.appengine.ext import ndb
 from google.appengine.ext import db
 from google.appengine.ext.webapp import template
 from google.appengine.api import channel
+from google.appengine.api import memcache
 
 deck = ['2s', '2h', '2d', '2c', '3s', '3h', '3d', '3c',
         '4s', '4h', '4d', '4c', '5s', '5h', '5d', '5c',
@@ -124,8 +125,6 @@ def get_server_move(cards):
 
 def broadcast(message, client_id=-1):
     clients = []
-    #self.response.out.write("Checking " + message)
-    #self.response.out.write("Client list:" + client_list)
     if(client_id !=-1 and client_id in client_list):
         clients = [client_id]
     else:
@@ -146,19 +145,30 @@ def retrieve_game_player_entity(game_id, player_id):
                         Game_Player_Status.player_id == player_id)).fetch(1)[0]
 
 def retrieve_player_entity(player_id):
+    player = memcache.get(str(player_id))
+    if player is not None:
+        return player
     return Player.query(Player.identifier == player_id).fetch(1)[0]
     
 def retrieve_game_entity(game_id):
+    game = memcache.get(str(game_id))
+    if game is not None:
+        return game
     return Game.query(Game.identifier == game_id).fetch(1)[0]
 
+@ndb.transactional
 def update_game_player_entity(game_player):
     game_player.put()
 
+@ndb.transactional
 def update_player_entity(player):
     player.put()
+    memcache.add(str(player.identifier), player, 1)
 
+@ndb.transactional
 def update_game_entity(game):
     game.put()
+    memcache.add(str(game.identifier), game, 5)
 
 def get_client_id(game_id, player_id):
     return str(game_id) + "-" + str(player_id)
@@ -219,7 +229,7 @@ def update_game(game_id, player_id=-1):
                                                 'player_id': str(player_id),
                                                 'status': status
                                            })
-                    broadcast(message)
+                    broadcast(message, client_id)
             elif game_player.status == PLAY:
                 actions = get_next_action(game_player, player.tokens);
                 message = simplejson.dumps({'game_id': str(game_id),
@@ -458,7 +468,6 @@ class GameAction(webapp.RequestHandler):
         player_stringified = simplejson.dumps({
                                 'game_id': str(game_id),
                                 'player_id': str(player_id),
-                                'status': game_player.status,
                                 'cards': new_cards
                             })
         broadcast(player_stringified)

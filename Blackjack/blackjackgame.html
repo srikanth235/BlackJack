@@ -68,8 +68,9 @@ function addNewPlayer(player_id) {
  }
 
  function renderStatus(info, id) {
+    alert("You " + info);
     $(info).appendTo(id)
- } 
+ }
 
  function renderActions(actions, id) {
     for(var i = 0; i < actions.length; i++) {
@@ -80,12 +81,13 @@ function addNewPlayer(player_id) {
  }
   
   onOpened = function() {  
-      alert("opened")  
+      //alert("opened")  
   }
   
   onClose = function() {  
       alert("closed")  
   }
+
   onMessage = function(m) {
      localStorage.setItem(id, m)
      player_data = JSON.parse(m.data);
@@ -102,7 +104,7 @@ function addNewPlayer(player_id) {
      }
 
      if('status' in player_data) {
-         renderStatus(player_data['status'], '#' + player_data['player_id'] + ' .info')
+         renderStatus(player_data['status'], '#tokens')
      }
      
      if('tokens' in player_data) {
